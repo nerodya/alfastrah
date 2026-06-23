@@ -1,28 +1,166 @@
 <!doctype html>
 <html lang="ru">
 <head>
-    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>AB Runner</title>
+    <!-- Подключаем PapaParse для корректной обработки сложных CSV с переносами строк -->
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <style>
-        body { margin:0; font-family: Arial, sans-serif; background:#f5f6f8; }
-        .wrap { display:flex; height:100vh; }
-        .sidebar { width:280px; background:#fff; border-right:1px solid #e5e7eb; padding:16px; }
-        .tab { padding:12px; border-radius:10px; cursor:pointer; margin-bottom:8px; }
-        .tab.active { background:#eef2ff; }
-        .main { flex:1; padding:24px; overflow:auto; }
-        .card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:18px; }
-        .row { display:flex; gap:12px; align-items:center; margin:12px 0; flex-wrap:wrap; }
-        button { padding:10px 16px; border-radius:999px; border:1px solid #16a34a; background:#16a34a; color:#fff; cursor:pointer; }
-        button:disabled { opacity:.6; cursor:not-allowed; }
-        .status { color:#b91c1c; margin-top:10px; white-space:pre-wrap; }
-        .progress { width:420px; max-width:100%; height:10px; background:#e5e7eb; border-radius:999px; overflow:hidden; }
-        .bar { height:10px; width:0%; background:#16a34a; transition: width .2s linear; }
-        table { border-collapse:collapse; width:100%; margin-top:14px; }
-        th, td { white-space: pre-wrap; border:1px solid #e5e7eb; padding:8px; text-align:left; font-size:14px; }
-        th { background:#f9fafb; position:sticky; top:0; }
-        .muted { color:#6b7280; }
+        body {
+          margin: 0;
+          font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+          background: #f8f9fa;
+          color: #333;
+        }
+        .wrap { display: flex; height: 100vh; }
+
+        /* Боковое меню */
+        .sidebar {
+          width: 280px;
+          background: #fff;
+          border-right: 1px solid #eef0f2;
+          padding: 20px 12px;
+        }
+        .tab {
+          padding: 12px 16px;
+          border-radius: 12px;
+          cursor: pointer;
+          margin-bottom: 4px;
+          font-size: 14px;
+          color: #666;
+          transition: all 0.2s;
+        }
+        .tab:hover { background: #f0f2f5; }
+        .tab.active {
+          background: #eef2ff;
+          color: #4f46e5;
+          font-weight: 500;
+        }
+
+        /* Основной контент */
+        .main { flex: 1; padding: 40px; overflow: auto; }
+
+        /* Карточка как на скрине */
+        .card {
+          background: #fff;
+          border: 1px solid #eef0f2;
+          border-radius: 20px;
+          padding: 24px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+          max-width: 1200px;
+          margin: 0 auto;
+        }
+
+        h2 {
+          font-size: 20px;
+          font-weight: 600;
+          margin: 0 0 8px 0;
+          color: #111;
+        }
+        .subtitle {
+          font-size: 14px;
+          color: #777;
+          margin-bottom: 20px;
+        }
+
+        /* Секция управления (кнопки и поиск) */
+        .control-row {
+          display: flex;
+          gap: 16px;
+          align-items: center;
+          margin-bottom: 24px;
+        }
+
+        .label-query {
+          font-size: 14px;
+          color: #666;
+          margin-right: 8px;
+        }
+
+        button {
+          padding: 10px 28px;
+          border-radius: 999px;
+          border: none;
+          background: #16a34a;
+          color: #fff;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 500;
+          transition: background 0.2s;
+        }
+        button:hover { background: #15803d; }
+        button:disabled { background: #a7f3d0; cursor: not-allowed; }
+
+        /* Статусы и прогресс */
+        .status-error {
+          color: #d32f2f;
+          font-size: 14px;
+          margin: 16px 0;
+          display: block;
+        }
+        .progress-container {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-left: 10px;
+        }
+        .progress {
+          width: 200px;
+          height: 6px;
+          background: #eee;
+          border-radius: 999px;
+          overflow: hidden;
+        }
+        .bar { height: 100%; width: 0%; background: #16a34a; transition: width 0.3s ease; }
+        .pct { font-size: 12px; color: #999; }
+
+        /* Стили таблиц */
+        .table-section { margin-top: 32px; }
+        .table-title {
+          font-size: 15px;
+          font-weight: 600;
+          margin-bottom: 12px;
+          color: #444;
+        }
+
+        .table-wrapper {
+          border: 1px solid #eef0f2;
+          border-radius: 12px;
+          overflow: hidden;
+        }
+
+        table { border-collapse: collapse; width: 100%; background: #fff; }
+
+        th {
+          background: #fcfcfc;
+          color: #888;
+          font-weight: 500;
+          font-size: 13px;
+          padding: 12px 16px;
+          text-align: left;
+          border-bottom: 1px solid #eef0f2;
+        }
+
+        td {
+          padding: 12px 16px;
+          font-size: 13px;
+          color: #444;
+          border-bottom: 1px solid #f5f7f9;
+          white-space: pre-wrap;
+          vertical-align: top;
+        }
+
+        tr:last-child td { border-bottom: none; }
+
+        .empty-state {
+          padding: 20px;
+          color: #999;
+          font-size: 13px;
+          text-align: left;
+          background: #fff;
+        }
+        .muted { color: #999; font-size: 13px; }
     </style>
 </head>
 <body>
@@ -31,27 +169,34 @@
         <div class="tab active" data-tab="underwriter">Помощник Андеррайтера</div>
         <div class="tab" data-tab="claims">Классификация страховых случаев</div>
         <div class="muted" style="margin-top:14px;font-size:12px;">
-            Нажмите «Поиск», дождитесь завершения и таблица заполнится из CSV.
+            Нажмите «Запустить анализ документов», дождитесь завершения, и таблицы заполнятся из CSV.
         </div>
     </div>
 
     <div class="main">
         <div class="card">
-            <h2 id="title" style="margin:0 0 8px 0;">Помощник Андеррайтера</h2>
+            <h2 id="title">Помощник Андеррайтера</h2>
+            <div id="subtitle" class="subtitle">Поиск информации по актуальным данным.</div>
 
-            <div class="row">
-                <button id="runBtn">Поиск</button>
-                <div class="progress">
-                    <div class="bar" id="bar"></div>
+            <div class="control-row">
+                <span class="label-query">Запрос</span>
+                <button id="runBtn">Запустить анализ документов</button>
+
+                <div class="progress-container">
+                    <div class="progress">
+                        <div class="bar" id="bar"></div>
+                    </div>
+                    <div id="pct" class="pct">0%</div>
                 </div>
-                <div id="pct" class="muted">0%</div>
             </div>
 
-            <div id="info" class="muted"></div>
-            <div id="err" class="status"></div>
+            <div id="info" class="muted" style="margin-bottom: 10px; font-size: 12px;"></div>
+            <div id="err" class="status-error"></div>
 
-            <div id="tableWrap">
-                <div class="muted">Данные ещё не загружены. Нажмите кнопку «Поиск».</div>
+            <div id="resultsContainer">
+                <div class="table-wrapper">
+                    <div class="empty-state">Данные ещё не загружены. Нажмите кнопку «Запустить анализ документов».</div>
+                </div>
             </div>
         </div>
     </div>
@@ -59,13 +204,31 @@
 
 <script>
     const tabs = {
-      underwriter: { title: "Помощник Андеррайтера" },
-      claims: { title: "Классификация страховых случаев" },
+      underwriter: {
+        title: "Помощник Андеррайтера",
+        outputs: [
+          { id: 1, name: "Цифровой профиль страхователя" },
+          { id: 2, name: "Цифровой профиль объекта страхования" },
+          { id: 0, name: "Анализ рисков" }
+        ]
+      },
+      claims: {
+        title: "Классификация страховых случаев",
+        outputs: [
+          { id: 0, name: "Результаты классификации" }
+        ]
+      },
     };
 
     let currentTab = "underwriter";
     let pollTimer = null;
     let requestId = null;
+
+    // ОБЪЕКТ ДЛЯ ХРАНЕНИЯ СОСТОЯНИЯ ВКЛАДОК
+    const tabState = {
+      underwriter: { resultsHtml: "", info: "", status: "0%", requestId: null },
+      claims: { resultsHtml: "", info: "", status: "0%", requestId: null },
+    };
 
     const titleEl = document.getElementById("title");
     const runBtn = document.getElementById("runBtn");
@@ -73,16 +236,34 @@
     const pctEl = document.getElementById("pct");
     const infoEl = document.getElementById("info");
     const errEl = document.getElementById("err");
-    const tableWrap = document.getElementById("tableWrap");
+    const resultsContainer = document.getElementById("resultsContainer");
 
     function setActiveTab(tabKey) {
       currentTab = tabKey;
       document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === tabKey));
       titleEl.textContent = tabs[tabKey].title;
-      resetUI(false);
+
+      // Вместо resetUI() восстанавливаем данные из tabState
+      restoreTabState();
     }
 
-    function resetUI(keepTab=true) {
+    function restoreTabState() {
+      const state = tabState[currentTab];
+
+      // Восстанавливаем прогресс и инфо
+      barEl.style.width = state.status;
+      pctEl.textContent = state.status;
+      infoEl.textContent = state.info;
+
+      // Восстанавливаем HTML таблиц
+      resultsContainer.innerHTML = state.resultsHtml || '<div class="muted">Данные ещё не загружены. Нажмите кнопку «Поиск».</div>';
+
+      // Кнопка активна, если сейчас ничего не крутится
+      runBtn.disabled = (pollTimer !== null);
+    }
+
+    // Теперь resetUI вызывается ТОЛЬКО при нажатии на кнопку "Поиск"
+    function resetUI() {
       if (pollTimer) clearInterval(pollTimer);
       pollTimer = null;
       requestId = null;
@@ -90,8 +271,8 @@
       pctEl.textContent = "0%";
       infoEl.textContent = "";
       errEl.textContent = "";
-      tableWrap.innerHTML = '<div class="muted">Данные ещё не загружены. Нажмите кнопку «Поиск».</div>';
-      runBtn.disabled = false;
+      resultsContainer.innerHTML = '<div class="muted">Загрузка данных...</div>';
+      runBtn.disabled = true;
     }
 
     document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => setActiveTab(t.dataset.tab)));
@@ -109,52 +290,55 @@
     }
 
     function parseCSV(text) {
-      // PapaParse корректно обрабатывает:
-      // - кавычки
-      // - запятые внутри значения
-      // - переносы строк внутри значения (как в вашем Предупреждение_Concat)
-      const results = Papa.parse(text, {
-        header: true,
-        skipEmptyLines: "greedy",
-        dynamicTyping: false,
-        // delimiter не задаём — Papa определит автоматически
-      });
-
-      if (results.errors && results.errors.length) {
-        // Покажем первую ошибку, но всё равно попробуем отрендерить что получилось
-        console.warn("CSV parse errors:", results.errors);
-      }
-
-      const columns = results.meta?.fields ?? [];
-      const rows = Array.isArray(results.data) ? results.data : [];
-
-      return { columns, rows };
+      const results = Papa.parse(text, { header: true, skipEmptyLines: "greedy" });
+      return { columns: results.meta?.fields ?? [], rows: results.data ?? [] };
     }
 
-    function renderTable(columns, rows) {
-      if (!columns.length) {
-        tableWrap.innerHTML = '<div class="muted">CSV пустой или без заголовков.</div>';
-        return;
-      }
-      let html = "<table><thead><tr>";
-      for (const c of columns) html += `<th>${c}</th>`;
-      html += "</tr></thead><tbody>";
-      for (const r of rows) {
-        html += "<tr>";
-        for (const c of columns) html += `<td>${(r[c] ?? "")}</td>`;
-        html += "</tr>";
-      }
-      html += "</tbody></table>";
-      tableWrap.innerHTML = html;
+    function renderTable(title, columns, rows) {
+    if (!columns.length) {
+      return `<div class="table-section">
+                <div class="table-title">${title}</div>
+                <div class="table-wrapper"><div class="empty-state">Данные отсутствуют.</div></div>
+              </div>`;
     }
 
-    async function loadResult() {
-      const r = await fetch(`/api/result/${requestId}?output=1`);
-      if (!r.ok) throw new Error(await r.text());
+    let html = `<div class="table-section">
+                  <div class="table-title">${title}</div>
+                  <div class="table-wrapper">
+                    <table><thead><tr>`;
 
-      const csvText = await r.text();
-      const { columns, rows } = parseCSV(csvText);
-      renderTable(columns, rows);
+    for (const c of columns) html += `<th>${c}</th>`;
+    html += `</tr></thead><tbody>`;
+
+    for (const r of rows) {
+      html += `<tr>`;
+      for (const c of columns) html += `<td>${(r[c] ?? "")}</td>`;
+      html += `</tr>`;
+    }
+    html += `</tbody></table></div></div>`;
+    return html;
+  }
+
+    async function loadAllResults() {
+      resultsContainer.innerHTML = "";
+      let fullHtml = ""; // Собираем весь HTML в одну строку
+      const currentTabConfig = tabs[currentTab];
+
+      for (const outputCfg of currentTabConfig.outputs) {
+        try {
+          const r = await fetch(`/api/result/${requestId}?output=${outputCfg.id}`);
+          if (!r.ok) throw new Error(`Ошибка output ${outputCfg.id}`);
+          const csvText = await r.text();
+          const { columns, rows } = parseCSV(csvText);
+          fullHtml += renderTable(outputCfg.name, columns, rows);
+        } catch (e) {
+          fullHtml += `<div class="status">Ошибка ${outputCfg.name}: ${e.message}</div>`;
+        }
+      }
+
+      resultsContainer.innerHTML = fullHtml;
+      // СОХРАНЯЕМ В ПАМЯТЬ
+      tabState[currentTab].resultsHtml = fullHtml;
     }
 
     function startPolling() {
@@ -166,26 +350,27 @@
           const st = data?.result?.status;
           const pr = data?.result?.progress;
 
-          infoEl.textContent =
-            `requestID=${requestId}, статус: ${statusText(st)}` +
-            (data?.result?.queueLength != null ? `, очередь: ${data.result.queueLength}` : "");
+          const statusMsg = `requestID=${requestId}, статус: ${statusText(st)}`;
+          infoEl.textContent = statusMsg;
 
           if (typeof pr === "number" && pr >= 0) {
-            barEl.style.width = `${pr}%`;
-            pctEl.textContent = `${pr}%`;
-          } else {
-            pctEl.textContent = "—";
+            const pct = `${pr}%`;
+            barEl.style.width = pct;
+            pctEl.textContent = pct;
+            // Сохраняем прогресс в память
+            tabState[currentTab].status = pct;
           }
+          tabState[currentTab].info = statusMsg;
 
           if (st === 2) {
             clearInterval(pollTimer);
             pollTimer = null;
-            await loadResult();
+            await loadAllResults();
             runBtn.disabled = false;
           } else if (st === 3 || st === -1) {
             clearInterval(pollTimer);
             pollTimer = null;
-            errEl.textContent = "Запрос завершился ошибкой. Проверьте AB/PA.";
+            errEl.textContent = "Запрос завершился ошибкой.";
             runBtn.disabled = false;
           }
         } catch (e) {
@@ -199,9 +384,8 @@
 
     runBtn.addEventListener("click", async () => {
       resetUI();
-      runBtn.disabled = true;
+      errEl.textContent = "";
       infoEl.textContent = "Запуск…";
-
       try {
         const r = await fetch(`/api/run/${currentTab}`, { method: "POST" });
         if (!r.ok) throw new Error(await r.text());

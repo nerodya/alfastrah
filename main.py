@@ -196,22 +196,26 @@ def run(tab_key: str):
     if tab_key not in TABS:
         raise HTTPException(404, "Unknown tab")
 
-    ab.ensure_ready()  # <-- важно
+    # 1. СНАЧАЛА принудительно инициализируем сессию и токены
+    ab.ensure_ready()
 
     payload = {
         "application": TABS[tab_key]["alias"],
         "parameters": build_parameters(),
     }
 
+    # 2. Теперь, когда токены в памяти, формируем параметры
+    params = ab.request_params_with_token({})
+
     r = ab.call(
         "POST",
         "/request/add",
-        params=ab.request_params_with_token({}),
+        params=params,
         json=payload
     )
     if r.status_code != 200:
         raise HTTPException(r.status_code, r.text)
-    return r.json()  # result.requestID [1]
+    return r.json()
 
 @app.get("/api/status/{request_id}")
 def status(request_id: int):
@@ -226,12 +230,12 @@ def status(request_id: int):
     return r.json()  # result.status, result.progress [1]
 
 @app.get("/api/result/{request_id}")
-def result_csv(request_id: int):
+def result_csv(request_id: int, output: int):
     ab.ensure_ready()  # <-- важно
     r = ab.call(
         "GET",
         "/request/download/csv",
-        params=ab.request_params_with_token({"id": request_id, "output": 0}),
+        params=ab.request_params_with_token({"id": request_id, "output": output}),
         timeout=120
     )
     if r.status_code != 200:
