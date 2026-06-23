@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>AB Runner</title>
+    <style>
+        body { margin:0; font-family: Arial, sans-serif; background:#f5f6f8; }
+        .wrap { display:flex; height:100vh; }
+        .sidebar { width:280px; background:#fff; border-right:1px solid #e5e7eb; padding:16px; }
+        .tab { padding:12px; border-radius:10px; cursor:pointer; margin-bottom:8px; }
+        .tab.active { background:#eef2ff; }
+        .main { flex:1; padding:24px; overflow:auto; }
+        .card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:18px; }
+        .row { display:flex; gap:12px; align-items:center; margin:12px 0; flex-wrap:wrap; }
+        button { padding:10px 16px; border-radius:999px; border:1px solid #16a34a; background:#16a34a; color:#fff; cursor:pointer; }
+        button:disabled { opacity:.6; cursor:not-allowed; }
+        .status { color:#b91c1c; margin-top:10px; white-space:pre-wrap; }
+        .progress { width:420px; max-width:100%; height:10px; background:#e5e7eb; border-radius:999px; overflow:hidden; }
+        .bar { height:10px; width:0%; background:#16a34a; transition: width .2s linear; }
+        table { border-collapse:collapse; width:100%; margin-top:14px; }
+        th, td { white-space: pre-wrap; border:1px solid #e5e7eb; padding:8px; text-align:left; font-size:14px; }
+        th { background:#f9fafb; position:sticky; top:0; }
+        .muted { color:#6b7280; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="sidebar">
+        <div class="tab active" data-tab="underwriter">Помощник Андеррайтера</div>
+        <div class="tab" data-tab="claims">Классификация страховых случаев</div>
+        <div class="muted" style="margin-top:14px;font-size:12px;">
+            Нажмите «Поиск», дождитесь завершения и таблица заполнится из CSV.
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="card">
+            <h2 id="title" style="margin:0 0 8px 0;">Помощник Андеррайтера</h2>
+
+            <div class="row">
+                <button id="runBtn">Поиск</button>
+                <div class="progress">
+                    <div class="bar" id="bar"></div>
+                </div>
+                <div id="pct" class="muted">0%</div>
+            </div>
+
+            <div id="info" class="muted"></div>
+            <div id="err" class="status"></div>
+
+            <div id="tableWrap">
+                <div class="muted">Данные ещё не загружены. Нажмите кнопку «Поиск».</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const tabs = {
+      underwriter: { title: "Помощник Андеррайтера" },
+      claims: { title: "Классификация страховых случаев" },
+    };
+
+    let currentTab = "underwriter";
+    let pollTimer = null;
+    let requestId = null;
+
+    const titleEl = document.getElementById("title");
+    const runBtn = document.getElementById("runBtn");
+    const barEl = document.getElementById("bar");
+    const pctEl = document.getElementById("pct");
+    const infoEl = document.getElementById("info");
+    const errEl = document.getElementById("err");
+    const tableWrap = document.getElementById("tableWrap");
+
+    function setActiveTab(tabKey) {
+      currentTab = tabKey;
+      document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === tabKey));
+      titleEl.textContent = tabs[tabKey].title;
+      resetUI(false);
+    }
+
+    function resetUI(keepTab=true) {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = null;
+      requestId = null;
+      barEl.style.width = "0%";
+      pctEl.textContent = "0%";
+      infoEl.textContent = "";
+      errEl.textContent = "";
+      tableWrap.innerHTML = '<div class="muted">Данные ещё не загружены. Нажмите кнопку «Поиск».</div>';
+      runBtn.disabled = false;
+    }
+
+    document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => setActiveTab(t.dataset.tab)));
+
+    function statusText(code) {
+      switch (code) {
+        case -1: return "Нет серверов для выполнения";
+        case 0: return "В очереди";
+        case 1: return "Выполняется";
+        case 2: return "Успешно завершено";
+        case 3: return "Ошибка выполнения";
+        case 4: return "Получение результатов";
+        default: return "Неизвестно";
+      }
+    }
+
+    function parseCSV(text) {
+      // PapaParse корректно обрабатывает:
+      // - кавычки
+      // - запятые внутри значения
+      // - переносы строк внутри значения (как в вашем Предупреждение_Concat)
+      const results = Papa.parse(text, {
+        header: true,
+        skipEmptyLines: "greedy",
+        dynamicTyping: false,
+        // delimiter не задаём — Papa определит автоматически
+      });
+
+      if (results.errors && results.errors.length) {
+        // Покажем первую ошибку, но всё равно попробуем отрендерить что получилось
+        console.warn("CSV parse errors:", results.errors);
+      }
+
+      const columns = results.meta?.fields ?? [];
+      const rows = Array.isArray(results.data) ? results.data : [];
+
+      return { columns, rows };
+    }
+
+    function renderTable(columns, rows) {
+      if (!columns.length) {
+        tableWrap.innerHTML = '<div class="muted">CSV пустой или без заголовков.</div>';
+        return;
+      }
+      let html = "<table><thead><tr>";
+      for (const c of columns) html += `<th>${c}</th>`;
+      html += "</tr></thead><tbody>";
+      for (const r of rows) {
+        html += "<tr>";
+        for (const c of columns) html += `<td>${(r[c] ?? "")}</td>`;
+        html += "</tr>";
+      }
+      html += "</tbody></table>";
+      tableWrap.innerHTML = html;
+    }
+
+    async function loadResult() {
+      const r = await fetch(`/api/result/${requestId}?output=1`);
+      if (!r.ok) throw new Error(await r.text());
+
+      const csvText = await r.text();
+      const { columns, rows } = parseCSV(csvText);
+      renderTable(columns, rows);
+    }
+
+    function startPolling() {
+      pollTimer = setInterval(async () => {
+        try {
+          const r = await fetch(`/api/status/${requestId}`);
+          if (!r.ok) throw new Error(await r.text());
+          const data = await r.json();
+          const st = data?.result?.status;
+          const pr = data?.result?.progress;
+
+          infoEl.textContent =
+            `requestID=${requestId}, статус: ${statusText(st)}` +
+            (data?.result?.queueLength != null ? `, очередь: ${data.result.queueLength}` : "");
+
+          if (typeof pr === "number" && pr >= 0) {
+            barEl.style.width = `${pr}%`;
+            pctEl.textContent = `${pr}%`;
+          } else {
+            pctEl.textContent = "—";
+          }
+
+          if (st === 2) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+            await loadResult();
+            runBtn.disabled = false;
+          } else if (st === 3 || st === -1) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+            errEl.textContent = "Запрос завершился ошибкой. Проверьте AB/PA.";
+            runBtn.disabled = false;
+          }
+        } catch (e) {
+          clearInterval(pollTimer);
+          pollTimer = null;
+          errEl.textContent = String(e);
+          runBtn.disabled = false;
+        }
+      }, 1000);
+    }
+
+    runBtn.addEventListener("click", async () => {
+      resetUI();
+      runBtn.disabled = true;
+      infoEl.textContent = "Запуск…";
+
+      try {
+        const r = await fetch(`/api/run/${currentTab}`, { method: "POST" });
+        if (!r.ok) throw new Error(await r.text());
+        const data = await r.json();
+        requestId = data?.result?.requestID;
+        if (!requestId) throw new Error("Не получили requestID");
+        startPolling();
+      } catch (e) {
+        errEl.textContent = String(e);
+        runBtn.disabled = false;
+      }
+    });
+</script>
+</body>
+</html>
