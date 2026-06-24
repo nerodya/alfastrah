@@ -1,14 +1,19 @@
-import json
+import logging
 import os
 import time
 import threading
-from typing import Any, Optional
+from contextlib import asynccontextmanager
+from typing import Optional
 
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator, ConfigDict
+
+from document_context import ask_ollama, doc_context
+
+logger = logging.getLogger(__name__)
 
 AB_BASE = (os.getenv("AB_BASE", "http://5.35.66.24:3010").rstrip("/"))
 AB_API = AB_BASE + "/api"
@@ -23,10 +28,6 @@ USER_MODE = os.getenv("AB_REQUEST_USER_MODE", "token_uuid")  # token_uuid | user
 AB_USER_UUID = os.getenv("AB_USER_UUID", "")  # нужно только если USER_MODE=user_uuid
 
 REQUEST_OUTPUT_INDEX = int(os.getenv("AB_OUTPUT_INDEX", "0"))
-
-AI_WEBHOOK_URL = os.getenv("AI_WEBHOOK_URL", "").strip()
-AI_REFRESH_WEBHOOK_URL = os.getenv("AI_REFRESH_WEBHOOK_URL", AI_WEBHOOK_URL).strip()
-AI_WEBHOOK_TIMEOUT = float(os.getenv("AI_WEBHOOK_TIMEOUT", "600"))
 
 TABS = {
     "underwriter": {"title": "Помощник Андеррайтера", "alias": "альфастр_1"},
@@ -214,7 +215,7 @@ class AbSession:
 class ChatSendRequest(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    sessionId: str = Field(..., min_length=1)
+    sessionId: str = Field(default="")
     chatInput: str | None = None
     message: str | None = None
 
@@ -231,83 +232,17 @@ class ChatRefreshRequest(BaseModel):
     force: bool = False
 
 
-def _call_webhook(
-    url: str,
-    payload: dict[str, Any] | list[Any],
-    *,
-    timeout: float | None = None,
-) -> dict[str, Any]:
-    if not url:
-        raise HTTPException(500, "AI_WEBHOOK_URL is not set")
-
-    read_timeout = timeout if timeout is not None else AI_WEBHOOK_TIMEOUT
-    http_timeout = httpx.Timeout(
-        connect=30.0,
-        read=read_timeout,
-        write=30.0,
-        pool=30.0,
-    )
-
+@asynccontextmanager
+async def lifespan(_: FastAPI):
     try:
-        with httpx.Client(timeout=http_timeout, follow_redirects=True) as client:
-            r = client.post(url, json=payload)
-    except httpx.RequestError as exc:
-        raise HTTPException(502, f"Webhook request failed: {exc}") from exc
-
-    if r.status_code >= 400:
-        raise HTTPException(r.status_code, f"Webhook error: {r.text}")
-
-    content_type = r.headers.get("content-type", "")
-    if "application/json" in content_type:
-        data = r.json()
-        return data if isinstance(data, dict) else {"result": data}
-
-    text = r.text.strip()
-    if text:
-        try:
-            parsed = json.loads(text)
-            if isinstance(parsed, dict):
-                return parsed
-            return {"result": parsed}
-        except json.JSONDecodeError:
-            return {"reply": text}
-
-    return {"reply": ""}
-
-
-def _extract_reply(data: dict[str, Any]) -> str:
-    for key in ("output", "reply", "answer", "message", "text", "content", "response"):
-        value = data.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-        if value is not None and not isinstance(value, (dict, list)):
-            text = str(value).strip()
-            if text:
-                return text
-
-    result = data.get("result")
-    if isinstance(result, str) and result.strip():
-        return result.strip()
-    if isinstance(result, dict):
-        nested = _extract_reply(result)
-        if nested:
-            return nested
-
-    choices = data.get("choices")
-    if isinstance(choices, list) and choices:
-        first = choices[0]
-        if isinstance(first, dict):
-            message = first.get("message")
-            if isinstance(message, dict):
-                content = message.get("content")
-                if isinstance(content, str) and content.strip():
-                    return content.strip()
-
-    return ""
+        doc_context.load()
+    except Exception as exc:
+        logger.error("Startup document context load failed: %s", exc)
+    yield
 
 
 ab = AbSession()
-app = FastAPI(title="AB UI+Proxy")
+app = FastAPI(title="AB UI+Proxy", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/", response_class=HTMLResponse)
@@ -374,23 +309,20 @@ if __name__ == "__main__":
 
 @app.post("/api/chat/send")
 def chat_send(body: ChatSendRequest):
-    payload = {
-        "sessionId": body.sessionId,
-        "action": "sendMessage",
-        "chatInput": body.chatInput,
-    }
-    data = _call_webhook(AI_WEBHOOK_URL, payload)
-    reply = _extract_reply(data)
-    if not reply:
-        raise HTTPException(502, "Webhook did not return a reply")
-    return {"reply": reply, "output": reply, "raw": data}
+    context = doc_context.get_context()
+    reply = ask_ollama(body.chatInput, context)
+    return {"reply": reply, "output": reply}
 
 
 @app.post("/api/chat/refresh")
 def chat_refresh(body: ChatRefreshRequest):
-    # Заглушка: имитация обновления документов в базе.
-    time.sleep(2)
+    try:
+        status = doc_context.refresh()
+    except Exception as exc:
+        raise HTTPException(500, f"Failed to reload documents: {exc}") from exc
+
     return {
         "message": "Документы в базе успешно обновлены.",
-        "raw": {"stub": True, "force": body.force},
+        "status": status,
+        "force": body.force,
     }
