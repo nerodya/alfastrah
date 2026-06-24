@@ -52,6 +52,7 @@ class AbSession:
         self._client = httpx.Client(timeout=60, follow_redirects=True)
         self._token_uuid: Optional[str] = None
         self._token_value: Optional[str] = None
+        self._last_auth: float = 0.0
 
     def _auth_user(self):
         if not AB_PASSWORD:
