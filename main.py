@@ -41,26 +41,29 @@ class AbSession:
     Держим одну shared-сессию (cookie jar) + api token.
     Без БД. Можно расширить до per-user сессий, но вам не нужно.
     """
+
     def __init__(self):
         self._lock = threading.Lock()
         self._client = httpx.Client(timeout=60, follow_redirects=True)
         self._token_uuid: Optional[str] = None
         self._token_value: Optional[str] = None
-        self._last_auth: float = 0.0
 
     def _auth_user(self):
         if not AB_PASSWORD:
             raise HTTPException(500, "AB_PASSWORD is not set")
 
-        # /auth/user: form-urlencoded login/password [1]
+        print("DEBUG: Requesting new cookies from /auth/user...")
         r = self._client.post(
             f"{AB_API}/auth/user",
             data={"login": AB_LOGIN, "password": AB_PASSWORD},
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
         if r.status_code != 200:
+            # Если логин не удался, очищаем куки, чтобы при следующем запросе снова попробовать
+            self._client.cookies.clear()
             raise HTTPException(r.status_code, f"AB auth failed: {r.text}")
-        self._last_auth = time.time()
+
+        print(f"DEBUG: Cookies received. Count: {len(self._client.cookies)}")
 
     def _get_user_info(self) -> dict:
         # /user/info [1]
@@ -126,26 +129,31 @@ class AbSession:
             raise HTTPException(500, f"AB apitoken response missing uuid/token: {token_resp}")
 
     def ensure_ready(self):
+        """
+        Проверяет физическое наличие кук в клиенте и наличие токенов в памяти.
+        """
         with self._lock:
-            if not self._token_uuid or not self._token_value:
+            # 1. Проверяем, есть ли хоть одна кука в клиенте
+            has_cookies = len(self._client.cookies) > 0
+
+            # 2. Проверяем, есть ли токены (UUID и Значение)
+            has_tokens = self._token_uuid and self._token_value
+
+            if has_cookies and has_tokens:
+                # Все на месте, ничего не делаем
+                return
+
+            print(f"DEBUG: Session incomplete. Cookies: {has_cookies}, Tokens: {has_tokens}")
+
+            # Если кук нет — логинимся
+            if not has_cookies:
                 self._auth_user()
+
+            # Если токенов нет (даже если куки появились) — получаем их
+            if not (self._token_uuid and self._token_value):
                 self._ensure_token()
 
-    def _request_user_param(self) -> str:
-        if USER_MODE == "user_uuid":
-            if not AB_USER_UUID:
-                raise HTTPException(500, "AB_USER_UUID is not set but AB_REQUEST_USER_MODE=user_uuid")
-            return AB_USER_UUID
-
-        # USER_MODE=token_uuid (по вашей схеме)
-        if not self._token_uuid:
-            raise HTTPException(500, "Token UUID not initialized")
-        return self._token_uuid
-
     def call(self, method: str, path: str, *, params=None, json=None, data=None, headers=None, timeout=60):
-        """
-        Вызов AB с авто-переавторизацией: при 401 делаем /auth/user и повторяем 1 раз.
-        """
         self.ensure_ready()
 
         def do_call():
@@ -160,18 +168,37 @@ class AbSession:
             )
 
         r = do_call()
+
+        # Если AB вернул 401, значит куки стали невалидными (истекли или удалены на сервере)
         if r.status_code == 401 and path != "/auth/user":
-            # сессия умерла -> обновим cookies и повторим
+            print("DEBUG: 401 Unauthorized. Clearing cookies and retrying...")
             with self._lock:
+                self._client.cookies.clear()  # Явно удаляем старые куки
                 self._auth_user()
-                # токен обычно сохраняется, но если права/сессия менялась — перестрахуемся
                 self._ensure_token()
             r = do_call()
 
         return r
 
+    def _request_user_param(self) -> str:
+        """
+        Определяет, какой UUID использовать в качестве параметра 'user' для /request/*
+        """
+        if USER_MODE == "user_uuid":
+            if not AB_USER_UUID:
+                raise HTTPException(
+                    500,
+                    "AB_USER_UUID is not set but AB_REQUEST_USER_MODE=user_uuid"
+                )
+            return AB_USER_UUID
+
+        # USER_MODE == "token_uuid" (ваш вариант)
+        if not self._token_uuid:
+            raise HTTPException(500, "Token UUID not initialized. Session is not ready.")
+        return self._token_uuid
+
     def request_params_with_token(self, extra: dict) -> dict:
-        # Для /request/* нужны query user+token [1]
+        # Теперь метод _request_user_param существует, и эта строка будет работать
         return {
             "user": self._request_user_param(),
             "token": self._token_value,
@@ -181,10 +208,6 @@ class AbSession:
 ab = AbSession()
 app = FastAPI(title="AB UI+Proxy")
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)
 
 @app.get("/", response_class=HTMLResponse)
 def index():
@@ -241,3 +264,8 @@ def result_csv(request_id: int, output: int):
     if r.status_code != 200:
         raise HTTPException(r.status_code, r.text)
     return Response(content=r.content, media_type="text/csv; charset=utf-8")  # [1]
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)
