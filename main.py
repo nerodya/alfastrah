@@ -24,7 +24,7 @@ AB_USER_UUID = os.getenv("AB_USER_UUID", "")  # нужно только если
 
 REQUEST_OUTPUT_INDEX = int(os.getenv("AB_OUTPUT_INDEX", "0"))
 
-AI_WEBHOOK_URL = os.getenv("AI_WEBHOOK_URL", "").strip()
+AI_WEBHOOK_URL = os.getenv("AI_WEBHOOK_URL", "https://agent.aidisi.cdemo.pro/webhook/5e56a263-3a40-44bd-bc9d-1cfb3bc2a87d/chat").strip()
 AI_REFRESH_WEBHOOK_URL = os.getenv("AI_REFRESH_WEBHOOK_URL", AI_WEBHOOK_URL).strip()
 AI_WEBHOOK_TIMEOUT = float(os.getenv("AI_WEBHOOK_TIMEOUT", "600"))
 
@@ -52,6 +52,7 @@ class AbSession:
         self._client = httpx.Client(timeout=60, follow_redirects=True)
         self._token_uuid: Optional[str] = None
         self._token_value: Optional[str] = None
+        self._last_auth: float = 0.0
 
     def _auth_user(self):
         if not AB_PASSWORD:
