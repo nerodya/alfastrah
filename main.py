@@ -175,7 +175,7 @@ class AbSession:
         r = do_call()
 
         # Если AB вернул 401, значит куки стали невалидными (истекли или удалены на сервере)
-        if r.status_code == 401 and path != "/auth/user":
+        if (r.status_code == 401 or r.status_code == 400) and path != "/auth/user":
             print("DEBUG: 401 Unauthorized. Clearing cookies and retrying...")
             with self._lock:
                 self._client.cookies.clear()  # Явно удаляем старые куки
