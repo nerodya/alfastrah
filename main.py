@@ -15,6 +15,11 @@ from document_context import ask_ollama, doc_context
 
 logger = logging.getLogger(__name__)
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
+
 AB_BASE = (os.getenv("AB_BASE", "http://5.35.66.24:3010").rstrip("/"))
 AB_API = AB_BASE + "/api"
 
@@ -29,7 +34,7 @@ AB_USER_UUID = os.getenv("AB_USER_UUID", "")  # нужно только если
 
 REQUEST_OUTPUT_INDEX = int(os.getenv("AB_OUTPUT_INDEX", "0"))
 
-AI_WEBHOOK_URL = os.getenv("AI_WEBHOOK_URL", "https://agent.aidisi.cdemo.pro/webhook/5e56a263-3a40-44bd-bc9d-1cfb3bc2a87d/chat").strip()
+AI_WEBHOOK_URL = os.getenv("AI_WEBHOOK_URL", "").strip()
 AI_REFRESH_WEBHOOK_URL = os.getenv("AI_REFRESH_WEBHOOK_URL", AI_WEBHOOK_URL).strip()
 AI_WEBHOOK_TIMEOUT = float(os.getenv("AI_WEBHOOK_TIMEOUT", "600"))
 
@@ -218,6 +223,7 @@ class AbSession:
 
 class ChatSendRequest(BaseModel):
     chatInput: str | None = None
+    applicationId: str | None = None
 
     @model_validator(mode="after")
     def resolve_chat_input(self):
@@ -225,6 +231,11 @@ class ChatSendRequest(BaseModel):
         if not text:
             raise ValueError("chatInput is required")
         self.chatInput = text
+
+        application_id = (self.applicationId or "").strip()
+        if not application_id:
+            raise ValueError("applicationId is required")
+        self.applicationId = application_id
         return self
 
 
@@ -309,7 +320,7 @@ if __name__ == "__main__":
 
 @app.post("/api/chat/send")
 def chat_send(body: ChatSendRequest):
-    context = doc_context.get_context()
+    context = doc_context.get_context(body.applicationId)
     reply = ask_ollama(body.chatInput, context)
     return {"reply": reply, "output": reply}
 

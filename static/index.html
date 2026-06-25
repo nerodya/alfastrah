@@ -93,13 +93,9 @@
           width: 42px;
           height: 42px;
           border-radius: 14px;
-          display: grid;
-          place-items: center;
-          font-weight: 700;
-          font-size: 18px;
-          color: #fff;
-          background: linear-gradient(135deg, var(--sidebar-red) 0%, var(--sidebar-red-dark) 100%);
-          box-shadow: 0 8px 20px rgba(215, 25, 32, 0.28);
+          display: block;
+          object-fit: cover;
+          flex-shrink: 0;
         }
 
         .brand-title {
@@ -953,7 +949,7 @@
 <div class="wrap">
     <div class="sidebar">
         <div class="sidebar-brand">
-            <div class="brand-mark" aria-hidden="true">А</div>
+            <img class="brand-mark" src="/static/image.png" width="42" height="42" alt="АльфаСтрахование">
             <div class="brand-text">
                 <div class="brand-title">Аналитика</div>
                 <div class="brand-subtitle">АльфаСтрахование</div>
@@ -1084,16 +1080,8 @@
     };
 
     const MOCK_APPLICATIONS = [
-      { id: "АС-2025-001847", client: "ООО «СтройГрад»", date: "12.06.2025" },
-      { id: "АС-2025-002391", client: "ИП Козлов А.В.", date: "10.06.2025" },
-      { id: "АС-2025-003156", client: "АО «ТехноПром»", date: "08.06.2025" },
-      { id: "АС-2024-018472", client: "ПАО «РосНефть-Сервис»", date: "28.12.2024" },
-      { id: "АС-2025-004829", client: "ООО «МегаМолл»", date: "05.06.2025" },
-      { id: "АС-2025-000712", client: "ЗАО «АгроЛайн»", date: "02.06.2025" },
-      { id: "АС-2024-029103", client: "ИП Смирнова Е.И.", date: "15.11.2024" },
-      { id: "АС-2025-005604", client: "ООО «ВекторСтрой»", date: "01.06.2025" },
-      { id: "АС-2025-006218", client: "ООО «СеверТранс»", date: "24.05.2025" },
-      { id: "АС-2024-031774", client: "АО «МедИнвест»", date: "03.10.2024" },
+      { id: "1", client: "Водянова А.И.", date: "12.06.2025" },
+      { id: "2", client: "Смирнова М.П.", date: "10.06.2025" },
     ];
 
     let currentTab = "underwriter";
@@ -1104,7 +1092,13 @@
     const tabState = {
       underwriter: { resultsHtml: "", info: "", status: "0%", requestId: null },
       claims: { resultsHtml: "", info: "", status: "0%", requestId: null },
-      ai_assistant: { messages: [], loading: false, refreshing: false, selectedApplication: null },
+      ai_assistant: {
+        messagesByApplication: {},
+        loading: false,
+        loadingApplicationId: null,
+        refreshing: false,
+        selectedApplication: null,
+      },
     };
 
     const titleEl = document.getElementById("title");
@@ -1127,6 +1121,15 @@
     const selectedApplicationStatusEl = document.getElementById("selectedApplicationStatus");
     const toastContainerEl = document.getElementById("toastContainer");
 
+    function getChatMessages(applicationId = tabState.ai_assistant.selectedApplication) {
+      if (!applicationId) return [];
+      const state = tabState.ai_assistant;
+      if (!state.messagesByApplication[applicationId]) {
+        state.messagesByApplication[applicationId] = [];
+      }
+      return state.messagesByApplication[applicationId];
+    }
+
     function updateSelectedApplicationStatus() {
       const selected = tabState.ai_assistant.selectedApplication;
       const chatMode = isChatTab(currentTab);
@@ -1139,7 +1142,9 @@
 
     function selectApplication(applicationId) {
       tabState.ai_assistant.selectedApplication = applicationId;
+      chatErrEl.textContent = "";
       renderApplicationPicker();
+      renderChatMessages();
     }
 
     function renderApplicationPicker() {
@@ -1200,16 +1205,6 @@
         .replace(/'/g, "&#39;");
     }
 
-    function getChatSessionId() {
-      const storageKey = "chatSessionId";
-      let sessionId = sessionStorage.getItem(storageKey);
-      if (!sessionId) {
-        sessionId = crypto.randomUUID().replace(/-/g, "");
-        sessionStorage.setItem(storageKey, sessionId);
-      }
-      return sessionId;
-    }
-
     if (window.marked) {
       marked.setOptions({
         breaks: true,
@@ -1238,12 +1233,14 @@
 
     function renderChatMessages() {
       const state = tabState.ai_assistant;
+      const messages = getChatMessages();
+      const isLoadingCurrent = state.loading && state.loadingApplicationId === state.selectedApplication;
       const parts = [];
 
-      if (!state.messages.length && !state.loading) {
+      if (!messages.length && !isLoadingCurrent) {
         parts.push('<div class="chat-empty">Задайте вопрос по документам. Ответ придёт от ИИ-помощника.</div>');
       } else {
-        for (const message of state.messages) {
+        for (const message of messages) {
           const bubbleClass = message.role === "assistant"
             ? "chat-bubble markdown-content"
             : "chat-bubble";
@@ -1253,7 +1250,7 @@
             </div>`
           );
         }
-        if (state.loading) {
+        if (isLoadingCurrent) {
           parts.push(
             `<div class="chat-message assistant typing">
               <div class="chat-bubble">ИИ печатает ответ...</div>
@@ -1268,10 +1265,11 @@
 
     function updateChatControls() {
       const state = tabState.ai_assistant;
-      const busy = state.loading || state.refreshing;
+      const busyCurrent = state.loading && state.loadingApplicationId === state.selectedApplication;
+      const busy = busyCurrent || state.refreshing;
       const noApplication = !state.selectedApplication;
       sendChatBtn.disabled = busy || noApplication;
-      refreshDocsBtn.disabled = busy;
+      refreshDocsBtn.disabled = state.refreshing;
       chatInputEl.disabled = busy;
       refreshDocsBtn.textContent = state.refreshing ? "Обновление..." : "Обновить документы";
     }
@@ -1457,14 +1455,18 @@
     });
 
     async function sendChatMessage() {
-      const text = chatInputEl.value.trim();
-      if (!text || tabState.ai_assistant.loading || !tabState.ai_assistant.selectedApplication) return;
-
       const state = tabState.ai_assistant;
-      state.messages.push({ role: "user", content: text });
+      const applicationId = state.selectedApplication;
+      const text = chatInputEl.value.trim();
+      if (!text || !applicationId) return;
+      if (state.loading && state.loadingApplicationId === applicationId) return;
+
+      const messages = getChatMessages(applicationId);
+      messages.push({ role: "user", content: text });
       chatInputEl.value = "";
       chatErrEl.textContent = "";
       state.loading = true;
+      state.loadingApplicationId = applicationId;
       renderChatMessages();
       updateChatControls();
 
@@ -1473,29 +1475,36 @@
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            sessionId: getChatSessionId(),
             chatInput: text,
+            applicationId,
           }),
         });
         if (!r.ok) throw new Error(await r.text());
         const data = await r.json();
-        state.messages.push({
+        getChatMessages(applicationId).push({
           role: "assistant",
           content: data.output || data.reply || "Пустой ответ.",
         });
       } catch (e) {
-        chatErrEl.textContent = String(e);
+        if (state.selectedApplication === applicationId) {
+          chatErrEl.textContent = String(e);
+        }
       } finally {
-        state.loading = false;
-        renderChatMessages();
-        updateChatControls();
-        chatInputEl.focus();
+        if (state.loadingApplicationId === applicationId) {
+          state.loading = false;
+          state.loadingApplicationId = null;
+        }
+        if (state.selectedApplication === applicationId) {
+          renderChatMessages();
+          updateChatControls();
+          chatInputEl.focus();
+        }
       }
     }
 
     async function refreshDocuments() {
       const state = tabState.ai_assistant;
-      if (state.loading || state.refreshing) return;
+      if (state.refreshing) return;
 
       chatErrEl.textContent = "";
       state.refreshing = true;
