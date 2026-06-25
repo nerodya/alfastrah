@@ -181,6 +181,36 @@
           background: rgba(255, 255, 255, 0.18);
         }
 
+        .nav-group {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .nav-group-children {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          padding-left: 10px;
+          margin-left: 24px;
+          border-left: 2px solid var(--sidebar-red-border);
+        }
+
+        .tab.subtab {
+          padding: 10px 14px;
+          font-size: 13px;
+        }
+
+        .nav-group.expanded > .tab:not(.subtab):not(.active) {
+          background: var(--sidebar-red-soft);
+          color: var(--sidebar-red-dark);
+          border-color: var(--sidebar-red-border);
+        }
+
+        .nav-group.expanded > .tab:not(.subtab):not(.active) .tab-icon {
+          background: #fecdd3;
+        }
+
         .sidebar-hint {
           margin-top: auto;
           padding: 14px 12px;
@@ -245,6 +275,18 @@
           color: var(--text-muted);
           margin: 0;
           line-height: 1.5;
+        }
+
+        .selected-application-status {
+          margin-top: 10px;
+          font-size: 18px;
+          font-weight: 600;
+          color: var(--sidebar-red-dark);
+          line-height: 1.45;
+        }
+
+        .selected-application-status.hidden {
+          display: none;
         }
 
         .control-row {
@@ -454,8 +496,140 @@
         }
         .chat-panel.active { display: flex; }
 
+        .chat-layout {
+          display: flex;
+          flex: 1;
+          min-height: 0;
+          min-width: 0;
+          gap: 16px;
+        }
+
+        .application-picker {
+          width: 300px;
+          flex-shrink: 0;
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-lg);
+          background: rgba(255, 255, 255, 0.95);
+        }
+
+        .application-picker-header {
+          padding: 16px 16px 12px;
+          border-bottom: 1px solid var(--border);
+          flex-shrink: 0;
+        }
+
+        .application-picker-title {
+          margin: 0 0 4px;
+          font-size: 15px;
+          font-weight: 600;
+          color: var(--text);
+        }
+
+        .application-picker-subtitle {
+          margin: 0;
+          font-size: 12px;
+          color: var(--text-muted);
+          line-height: 1.45;
+        }
+
+        .application-list {
+          flex: 1;
+          min-height: 0;
+          overflow-y: auto;
+          padding: 10px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .application-list::-webkit-scrollbar { width: 8px; }
+        .application-list::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 999px;
+        }
+
+        .application-item {
+          display: block;
+          width: 100%;
+          padding: 13px 18px;
+          border-radius: var(--radius-md);
+          border: 1px solid var(--border);
+          background: transparent;
+          cursor: pointer;
+          text-align: left;
+          font: inherit;
+          font-size: 14px;
+          font-weight: 500;
+          color: var(--sidebar-text);
+          transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+        }
+
+        button.application-item {
+          appearance: none;
+          -webkit-appearance: none;
+          border: 1px solid var(--border);
+          box-shadow: none;
+          transform: none;
+        }
+
+        button.application-item:hover:not(:disabled),
+        button.application-item:active:not(:disabled),
+        button.application-item:focus,
+        button.application-item:focus-visible,
+        button.application-item.active {
+          box-shadow: none;
+          transform: none;
+        }
+
+        button.application-item:focus,
+        button.application-item:focus-visible {
+          outline: none;
+        }
+
+        .application-item:hover {
+          background: var(--sidebar-red-soft);
+          color: var(--sidebar-red-dark);
+          border-color: var(--border-strong);
+        }
+
+        .application-item.active {
+          background: linear-gradient(135deg, var(--sidebar-red) 0%, var(--sidebar-red-dark) 100%);
+          color: var(--sidebar-text-active);
+          border-color: transparent;
+        }
+
+        .application-number {
+          display: block;
+          font-size: 14px;
+          font-weight: 500;
+          color: inherit;
+          letter-spacing: -0.01em;
+        }
+
+        .application-meta {
+          display: block;
+          margin-top: 4px;
+          font-size: 12px;
+          color: var(--text-muted);
+          line-height: 1.4;
+        }
+
+        .application-item:hover .application-meta {
+          color: inherit;
+          opacity: 0.82;
+        }
+
+        .application-item.active .application-meta {
+          color: rgba(255, 255, 255, 0.82);
+          opacity: 1;
+        }
+
         .chat-messages {
           flex: 1;
+          min-width: 0;
           min-height: 0;
           overflow-y: auto;
           border: 1px solid var(--border);
@@ -738,8 +912,17 @@
             box-shadow: none;
           }
           .sidebar-hint { display: none; }
-          .sidebar-nav { flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
+          .sidebar-nav { flex-direction: row; overflow-x: auto; padding-bottom: 4px; gap: 8px; }
+          .nav-group { flex-direction: row; align-items: stretch; gap: 8px; }
+          .nav-group-children {
+            flex-direction: row;
+            padding-left: 0;
+            margin-left: 0;
+            border-left: none;
+            gap: 8px;
+          }
           .tab { white-space: nowrap; min-width: max-content; }
+          .tab.subtab { padding: 13px 18px; font-size: 14px; }
           .main { padding: 10px; }
           .card { padding: 16px; }
           .page-header { margin-bottom: 14px; padding-bottom: 14px; }
@@ -747,6 +930,13 @@
           .control-row { flex-direction: column; align-items: stretch; }
           .progress-container { width: 100%; min-width: 0; }
           .chat-bubble { max-width: 92%; }
+          .chat-layout {
+            flex-direction: column;
+          }
+          .application-picker {
+            width: auto;
+            max-height: 220px;
+          }
           .chat-composer {
             flex-direction: column;
             align-items: stretch;
@@ -772,17 +962,21 @@
 
         <div class="sidebar-section-label">Разделы</div>
         <nav class="sidebar-nav" aria-label="Навигация">
-            <div class="tab active" data-tab="underwriter">
-                <span class="tab-icon" aria-hidden="true">📊</span>
-                <span>Помощник Андеррайтера</span>
+            <div class="nav-group expanded" data-group="underwriter">
+                <div class="tab active" data-tab="underwriter">
+                    <span class="tab-icon" aria-hidden="true">📊</span>
+                    <span>Помощник Андеррайтера</span>
+                </div>
+                <div class="nav-group-children">
+                    <div class="tab subtab" data-tab="ai_assistant">
+                        <span class="tab-icon" aria-hidden="true">🔍</span>
+                        <span>Поиск по документам</span>
+                    </div>
+                </div>
             </div>
             <div class="tab" data-tab="claims">
                 <span class="tab-icon" aria-hidden="true">🏷️</span>
                 <span>Классификация страховых случаев</span>
-            </div>
-            <div class="tab" data-tab="ai_assistant">
-                <span class="tab-icon" aria-hidden="true">🔍</span>
-                <span>Поиск по документам</span>
             </div>
         </nav>
 
@@ -797,6 +991,7 @@
                 <div>
                     <h2 id="title">Помощник Андеррайтера</h2>
                     <div id="subtitle" class="subtitle">Поиск информации по актуальным данным.</div>
+                    <div id="selectedApplicationStatus" class="selected-application-status hidden"></div>
                 </div>
             </div>
 
@@ -826,8 +1021,18 @@
             </div>
 
             <div id="chatPanel" class="chat-panel">
-                <div id="chatMessages" class="chat-messages">
-                    <div class="chat-empty">Задайте вопрос по документам. Ответ придёт от ИИ-помощника.</div>
+                <div class="chat-layout">
+                    <div id="chatMessages" class="chat-messages">
+                        <div class="chat-empty">Задайте вопрос по документам. Ответ придёт от ИИ-помощника.</div>
+                    </div>
+
+                    <aside class="application-picker" aria-label="Выбор заявок">
+                        <div class="application-picker-header">
+                            <h3 class="application-picker-title">Номера заявок</h3>
+                            <p class="application-picker-subtitle">Выберите заявку для поиска по документам.</p>
+                        </div>
+                        <div id="applicationList" class="application-list"></div>
+                    </aside>
                 </div>
 
                 <div id="chatErr" class="status-error"></div>
@@ -878,6 +1083,19 @@
       },
     };
 
+    const MOCK_APPLICATIONS = [
+      { id: "АС-2025-001847", client: "ООО «СтройГрад»", date: "12.06.2025" },
+      { id: "АС-2025-002391", client: "ИП Козлов А.В.", date: "10.06.2025" },
+      { id: "АС-2025-003156", client: "АО «ТехноПром»", date: "08.06.2025" },
+      { id: "АС-2024-018472", client: "ПАО «РосНефть-Сервис»", date: "28.12.2024" },
+      { id: "АС-2025-004829", client: "ООО «МегаМолл»", date: "05.06.2025" },
+      { id: "АС-2025-000712", client: "ЗАО «АгроЛайн»", date: "02.06.2025" },
+      { id: "АС-2024-029103", client: "ИП Смирнова Е.И.", date: "15.11.2024" },
+      { id: "АС-2025-005604", client: "ООО «ВекторСтрой»", date: "01.06.2025" },
+      { id: "АС-2025-006218", client: "ООО «СеверТранс»", date: "24.05.2025" },
+      { id: "АС-2024-031774", client: "АО «МедИнвест»", date: "03.10.2024" },
+    ];
+
     let currentTab = "underwriter";
     let pollTimer = null;
     let requestId = null;
@@ -886,7 +1104,7 @@
     const tabState = {
       underwriter: { resultsHtml: "", info: "", status: "0%", requestId: null },
       claims: { resultsHtml: "", info: "", status: "0%", requestId: null },
-      ai_assistant: { messages: [], loading: false, refreshing: false },
+      ai_assistant: { messages: [], loading: false, refreshing: false, selectedApplication: null },
     };
 
     const titleEl = document.getElementById("title");
@@ -905,7 +1123,49 @@
     const chatErrEl = document.getElementById("chatErr");
     const refreshDocsBtn = document.getElementById("refreshDocsBtn");
     const sendChatBtn = document.getElementById("sendChatBtn");
+    const applicationListEl = document.getElementById("applicationList");
+    const selectedApplicationStatusEl = document.getElementById("selectedApplicationStatus");
     const toastContainerEl = document.getElementById("toastContainer");
+
+    function updateSelectedApplicationStatus() {
+      const selected = tabState.ai_assistant.selectedApplication;
+      const chatMode = isChatTab(currentTab);
+
+      selectedApplicationStatusEl.classList.toggle("hidden", !chatMode);
+      selectedApplicationStatusEl.textContent = selected
+        ? `Выбрана: ${selected}`
+        : "Заявка не выбрана";
+    }
+
+    function selectApplication(applicationId) {
+      tabState.ai_assistant.selectedApplication = applicationId;
+      renderApplicationPicker();
+    }
+
+    function renderApplicationPicker() {
+      const selected = tabState.ai_assistant.selectedApplication;
+      applicationListEl.innerHTML = MOCK_APPLICATIONS.map(app => {
+        const isSelected = selected === app.id;
+        return `<button
+          type="button"
+          class="application-item${isSelected ? " active" : ""}"
+          data-application-id="${escapeHtml(app.id)}"
+          aria-pressed="${isSelected}"
+        >
+          <span class="application-number">${escapeHtml(app.id)}</span>
+          <span class="application-meta">${escapeHtml(app.client)}<br>${escapeHtml(app.date)}</span>
+        </button>`;
+      }).join("");
+
+      applicationListEl.querySelectorAll(".application-item").forEach(item => {
+        item.addEventListener("click", () => {
+          selectApplication(item.dataset.applicationId);
+        });
+      });
+
+      updateSelectedApplicationStatus();
+      updateChatControls();
+    }
 
     function showNotification(message, title = "Готово") {
       const toast = document.createElement("div");
@@ -1009,7 +1269,8 @@
     function updateChatControls() {
       const state = tabState.ai_assistant;
       const busy = state.loading || state.refreshing;
-      sendChatBtn.disabled = busy;
+      const noApplication = !state.selectedApplication;
+      sendChatBtn.disabled = busy || noApplication;
       refreshDocsBtn.disabled = busy;
       chatInputEl.disabled = busy;
       refreshDocsBtn.textContent = state.refreshing ? "Обновление..." : "Обновить документы";
@@ -1018,8 +1279,13 @@
     function setActiveTab(tabKey) {
       currentTab = tabKey;
       document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === tabKey));
+      document.querySelectorAll(".nav-group").forEach(g => {
+        const groupTabs = Array.from(g.querySelectorAll(".tab")).map(t => t.dataset.tab);
+        g.classList.toggle("expanded", groupTabs.includes(tabKey));
+      });
       titleEl.textContent = tabs[tabKey].title;
       subtitleEl.textContent = tabs[tabKey].subtitle || "";
+      updateSelectedApplicationStatus();
 
       const chatMode = isChatTab(tabKey);
       runnerPanelEl.classList.toggle("hidden", chatMode);
@@ -1030,6 +1296,7 @@
 
       if (chatMode) {
         renderChatMessages();
+        renderApplicationPicker();
         updateChatControls();
         chatErrEl.textContent = "";
       } else {
@@ -1191,7 +1458,7 @@
 
     async function sendChatMessage() {
       const text = chatInputEl.value.trim();
-      if (!text || tabState.ai_assistant.loading) return;
+      if (!text || tabState.ai_assistant.loading || !tabState.ai_assistant.selectedApplication) return;
 
       const state = tabState.ai_assistant;
       state.messages.push({ role: "user", content: text });
