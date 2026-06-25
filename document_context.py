@@ -14,6 +14,7 @@ from pypdf import PdfReader
 logger = logging.getLogger(__name__)
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "").strip()
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "frob/qwen3.5-instruct:27b").strip()
 OLLAMA_TIMEOUT = float(os.getenv("OLLAMA_TIMEOUT", "600"))
 DOCUMENTS_DIR = Path(os.getenv("DOCUMENTS_DIR", "documents"))
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".doc"}
