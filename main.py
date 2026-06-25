@@ -29,6 +29,10 @@ AB_USER_UUID = os.getenv("AB_USER_UUID", "")  # нужно только если
 
 REQUEST_OUTPUT_INDEX = int(os.getenv("AB_OUTPUT_INDEX", "0"))
 
+AI_WEBHOOK_URL = os.getenv("AI_WEBHOOK_URL", "https://agent.aidisi.cdemo.pro/webhook/5e56a263-3a40-44bd-bc9d-1cfb3bc2a87d/chat").strip()
+AI_REFRESH_WEBHOOK_URL = os.getenv("AI_REFRESH_WEBHOOK_URL", AI_WEBHOOK_URL).strip()
+AI_WEBHOOK_TIMEOUT = float(os.getenv("AI_WEBHOOK_TIMEOUT", "600"))
+
 TABS = {
     "underwriter": {"title": "Помощник Андеррайтера", "alias": "альфастр_1"},
     "claims": {"title": "Классификация страховых случаев", "alias": "альфастр_2"},
@@ -177,7 +181,7 @@ class AbSession:
         r = do_call()
 
         # Если AB вернул 401, значит куки стали невалидными (истекли или удалены на сервере)
-        if r.status_code == 401 and path != "/auth/user":
+        if (r.status_code == 401 or r.status_code == 400) and path != "/auth/user":
             print("DEBUG: 401 Unauthorized. Clearing cookies and retrying...")
             with self._lock:
                 self._client.cookies.clear()  # Явно удаляем старые куки
