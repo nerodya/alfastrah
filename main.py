@@ -9,7 +9,7 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, model_validator, ConfigDict
+from pydantic import BaseModel, model_validator
 
 from document_context import ask_ollama, doc_context
 
@@ -213,15 +213,11 @@ class AbSession:
         }
 
 class ChatSendRequest(BaseModel):
-    model_config = ConfigDict(extra="ignore", populate_by_name=True)
-
-    sessionId: str = Field(default="")
     chatInput: str | None = None
-    message: str | None = None
 
     @model_validator(mode="after")
     def resolve_chat_input(self):
-        text = (self.chatInput or self.message or "").strip()
+        text = (self.chatInput or "").strip()
         if not text:
             raise ValueError("chatInput is required")
         self.chatInput = text
